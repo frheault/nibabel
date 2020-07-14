@@ -1,0 +1,13 @@
+.. AUTO-GENERATED FILE -- DO NOT EDIT!
+
+:mod:`_h5py_compat`
+===================
+.. automodule:: nibabel._h5py_compat
+
+.. currentmodule:: nibabel._h5py_compat
+.. autosummary::
+
+
+
+.. currentmodule:: nibabel._h5py_compat
+

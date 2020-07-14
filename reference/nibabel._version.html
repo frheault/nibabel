@@ -1,0 +1,405 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Neuroimaging in Python &#8212; NiBabel 3.1.1 documentation</title>
+    <link rel="stylesheet" href="../_static/nibabel.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/graphviz.css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script type="text/javascript" src="../_static/jquery.js"></script>
+    <script type="text/javascript" src="../_static/underscore.js"></script>
+    <script type="text/javascript" src="../_static/doctools.js"></script>
+    <script type="text/javascript" src="../_static/language_data.js"></script>
+    <script async="async" type="text/javascript" src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="benchmarks" href="nibabel.benchmarks.html" />
+    <link rel="prev" title="_h5py_compat" href="nibabel._h5py_compat.html" />
+  <meta name="keywords" content="nipy, neuroimaging, python, neuroscience">
+
+  </head><body>
+<div style="background-color: white; text-align: left; padding-left: 150px; padding-bottom:50px; padding-top:20px; background-image: url(../_static/nipy-logo-bg-138x120.png); background-repeat: no-repeat;">
+<h1>NiBabel</h1>
+<h3 style="margin-top:-5px;color:#2f83c8">Access a cacophony of neuro-imaging file formats</h3>
+</div>
+
+    <div class="related" role="navigation" aria-label="related navigation">
+      <h3>Navigation</h3>
+      <ul>
+        <li class="right" style="margin-right: 10px">
+          <a href="../genindex.html" title="General Index"
+             accesskey="I">index</a></li>
+        <li class="right" >
+          <a href="../py-modindex.html" title="Python Module Index"
+             >modules</a> |</li>
+        <li class="right" >
+          <a href="nibabel.benchmarks.html" title="benchmarks"
+             accesskey="N">next</a> |</li>
+        <li class="right" >
+          <a href="nibabel._h5py_compat.html" title="_h5py_compat"
+             accesskey="P">previous</a> |</li>
+  <li><a href="http://nipy.org/">Community</a> |&nbsp;</li>
+  <li><a href="../index.html">NiBabel Home</a> |&nbsp;</li>
+  <li><a href="https://mail.python.org/mailman/listinfo/neuroimaging">Mailing list</a> |&nbsp;</li>
+  <li><a href="legal.html">License</a> |&nbsp;</li>
+
+          <li class="nav-item nav-item-1"><a href="../api.html" >API Documentation</a> &#187;</li>
+          <li class="nav-item nav-item-2"><a href="index.html" accesskey="U">API Reference</a> &#187;</li> 
+      </ul>
+    </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+  <h3><a href="../index.html">Table of Contents</a></h3>
+  <ul>
+<li><a class="reference internal" href="#"><code class="xref py py-mod docutils literal notranslate"><span class="pre">_version</span></code></a><ul>
+<li><a class="reference internal" href="#notthismethod"><code class="xref py py-class docutils literal notranslate"><span class="pre">NotThisMethod</span></code></a></li>
+<li><a class="reference internal" href="#versioneerconfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">VersioneerConfig</span></code></a></li>
+<li><a class="reference internal" href="#get-config">get_config</a></li>
+<li><a class="reference internal" href="#get-keywords">get_keywords</a></li>
+<li><a class="reference internal" href="#get-versions">get_versions</a></li>
+<li><a class="reference internal" href="#git-get-keywords">git_get_keywords</a></li>
+<li><a class="reference internal" href="#git-pieces-from-vcs">git_pieces_from_vcs</a></li>
+<li><a class="reference internal" href="#git-versions-from-keywords">git_versions_from_keywords</a></li>
+<li><a class="reference internal" href="#plus-or-dot">plus_or_dot</a></li>
+<li><a class="reference internal" href="#register-vcs-handler">register_vcs_handler</a></li>
+<li><a class="reference internal" href="#render">render</a></li>
+<li><a class="reference internal" href="#render-git-describe">render_git_describe</a></li>
+<li><a class="reference internal" href="#render-git-describe-long">render_git_describe_long</a></li>
+<li><a class="reference internal" href="#render-pep440">render_pep440</a></li>
+<li><a class="reference internal" href="#render-pep440-old">render_pep440_old</a></li>
+<li><a class="reference internal" href="#render-pep440-post">render_pep440_post</a></li>
+<li><a class="reference internal" href="#render-pep440-pre">render_pep440_pre</a></li>
+<li><a class="reference internal" href="#run-command">run_command</a></li>
+<li><a class="reference internal" href="#versions-from-parentdir">versions_from_parentdir</a></li>
+</ul>
+</li>
+</ul>
+
+  <h4>Previous topic</h4>
+  <p class="topless"><a href="nibabel._h5py_compat.html"
+                        title="previous chapter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">_h5py_compat</span></code></a></p>
+  <h4>Next topic</h4>
+  <p class="topless"><a href="nibabel.benchmarks.html"
+                        title="next chapter"><code class="xref py py-mod docutils literal notranslate"><span class="pre">benchmarks</span></code></a></p>
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="../_sources/reference/nibabel._version.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+        </div>
+      </div>
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="module-nibabel._version">
+<span id="version"></span><h1><code class="xref py py-mod docutils literal notranslate"><span class="pre">_version</span></code><a class="headerlink" href="#module-nibabel._version" title="Permalink to this headline">¶</a></h1>
+<p>Git implementation of _version.py.</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.NotThisMethod" title="nibabel._version.NotThisMethod"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NotThisMethod</span></code></a></p></td>
+<td><p>Exception raised if a method is not valid for the current scenario.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.VersioneerConfig" title="nibabel._version.VersioneerConfig"><code class="xref py py-obj docutils literal notranslate"><span class="pre">VersioneerConfig</span></code></a></p></td>
+<td><p>Container for Versioneer configuration parameters.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.get_config" title="nibabel._version.get_config"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_config</span></code></a>()</p></td>
+<td><p>Create, populate and return the VersioneerConfig() object.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.get_keywords" title="nibabel._version.get_keywords"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_keywords</span></code></a>()</p></td>
+<td><p>Get the keywords needed to look up the version information.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.get_versions" title="nibabel._version.get_versions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_versions</span></code></a>()</p></td>
+<td><p>Get version information or return default if unable to do so.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.git_get_keywords" title="nibabel._version.git_get_keywords"><code class="xref py py-obj docutils literal notranslate"><span class="pre">git_get_keywords</span></code></a>(versionfile_abs)</p></td>
+<td><p>Extract version information from the given file.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.git_pieces_from_vcs" title="nibabel._version.git_pieces_from_vcs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">git_pieces_from_vcs</span></code></a>(tag_prefix, root, verbose)</p></td>
+<td><p>Get version from ‘git describe’ in the root of the source tree.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.git_versions_from_keywords" title="nibabel._version.git_versions_from_keywords"><code class="xref py py-obj docutils literal notranslate"><span class="pre">git_versions_from_keywords</span></code></a>(keywords, …)</p></td>
+<td><p>Get version information from git keywords.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.plus_or_dot" title="nibabel._version.plus_or_dot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">plus_or_dot</span></code></a>(pieces)</p></td>
+<td><p>Return a + if we don’t already have one, else return a .</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.register_vcs_handler" title="nibabel._version.register_vcs_handler"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_vcs_handler</span></code></a>(vcs, method)</p></td>
+<td><p>Decorator to mark a method as the handler for a particular VCS.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.render" title="nibabel._version.render"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render</span></code></a>(pieces, style)</p></td>
+<td><p>Render the given version pieces into the requested style.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.render_git_describe" title="nibabel._version.render_git_describe"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render_git_describe</span></code></a>(pieces)</p></td>
+<td><p>TAG[-DISTANCE-gHEX][-dirty].</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.render_git_describe_long" title="nibabel._version.render_git_describe_long"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render_git_describe_long</span></code></a>(pieces)</p></td>
+<td><p>TAG-DISTANCE-gHEX[-dirty].</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.render_pep440" title="nibabel._version.render_pep440"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render_pep440</span></code></a>(pieces)</p></td>
+<td><p>Build up version string, with post-release “local version identifier”.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.render_pep440_old" title="nibabel._version.render_pep440_old"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render_pep440_old</span></code></a>(pieces)</p></td>
+<td><p>TAG[.postDISTANCE[.dev0]] .</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.render_pep440_post" title="nibabel._version.render_pep440_post"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render_pep440_post</span></code></a>(pieces)</p></td>
+<td><p>TAG[.postDISTANCE[.dev0]+gHEX] .</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.render_pep440_pre" title="nibabel._version.render_pep440_pre"><code class="xref py py-obj docutils literal notranslate"><span class="pre">render_pep440_pre</span></code></a>(pieces)</p></td>
+<td><p>TAG[.post.devDISTANCE] – No -dirty.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#nibabel._version.run_command" title="nibabel._version.run_command"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run_command</span></code></a>(commands, args[, cwd, verbose, …])</p></td>
+<td><p>Call the given command(s).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#nibabel._version.versions_from_parentdir" title="nibabel._version.versions_from_parentdir"><code class="xref py py-obj docutils literal notranslate"><span class="pre">versions_from_parentdir</span></code></a>(parentdir_prefix, …)</p></td>
+<td><p>Try to determine the version from the parent directory name.</p></td>
+</tr>
+</tbody>
+</table>
+<div class="section" id="notthismethod">
+<h2><a class="reference internal" href="#nibabel._version.NotThisMethod" title="nibabel._version.NotThisMethod"><code class="xref py py-class docutils literal notranslate"><span class="pre">NotThisMethod</span></code></a><a class="headerlink" href="#notthismethod" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="nibabel._version.NotThisMethod">
+<em class="property">class </em><code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">NotThisMethod</code><a class="headerlink" href="#nibabel._version.NotThisMethod" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">Exception</span></code></p>
+<p>Exception raised if a method is not valid for the current scenario.</p>
+<dl class="method">
+<dt id="nibabel._version.NotThisMethod.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">self</em>, <em class="sig-param">/</em>, <em class="sig-param">*args</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.NotThisMethod.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="versioneerconfig">
+<h2><a class="reference internal" href="#nibabel._version.VersioneerConfig" title="nibabel._version.VersioneerConfig"><code class="xref py py-class docutils literal notranslate"><span class="pre">VersioneerConfig</span></code></a><a class="headerlink" href="#versioneerconfig" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="nibabel._version.VersioneerConfig">
+<em class="property">class </em><code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">VersioneerConfig</code><a class="headerlink" href="#nibabel._version.VersioneerConfig" title="Permalink to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Container for Versioneer configuration parameters.</p>
+<dl class="method">
+<dt id="nibabel._version.VersioneerConfig.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">self</em>, <em class="sig-param">/</em>, <em class="sig-param">*args</em>, <em class="sig-param">**kwargs</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.VersioneerConfig.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize self.  See help(type(self)) for accurate signature.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+<div class="section" id="get-config">
+<h2>get_config<a class="headerlink" href="#get-config" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.get_config">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">get_config</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.get_config" title="Permalink to this definition">¶</a></dt>
+<dd><p>Create, populate and return the VersioneerConfig() object.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="get-keywords">
+<h2>get_keywords<a class="headerlink" href="#get-keywords" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.get_keywords">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">get_keywords</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.get_keywords" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get the keywords needed to look up the version information.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="get-versions">
+<h2>get_versions<a class="headerlink" href="#get-versions" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.get_versions">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">get_versions</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.get_versions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get version information or return default if unable to do so.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="git-get-keywords">
+<h2>git_get_keywords<a class="headerlink" href="#git-get-keywords" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.git_get_keywords">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">git_get_keywords</code><span class="sig-paren">(</span><em class="sig-param">versionfile_abs</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.git_get_keywords" title="Permalink to this definition">¶</a></dt>
+<dd><p>Extract version information from the given file.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="git-pieces-from-vcs">
+<h2>git_pieces_from_vcs<a class="headerlink" href="#git-pieces-from-vcs" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.git_pieces_from_vcs">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">git_pieces_from_vcs</code><span class="sig-paren">(</span><em class="sig-param">tag_prefix</em>, <em class="sig-param">root</em>, <em class="sig-param">verbose</em>, <em class="sig-param">run_command=&lt;function run_command at 0x7f898abaa290&gt;</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.git_pieces_from_vcs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get version from ‘git describe’ in the root of the source tree.</p>
+<p>This only gets called if the git-archive ‘subst’ keywords were <em>not</em>
+expanded, and _version.py hasn’t already been rewritten with a short
+version string, meaning we’re inside a checked out source tree.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="git-versions-from-keywords">
+<h2>git_versions_from_keywords<a class="headerlink" href="#git-versions-from-keywords" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.git_versions_from_keywords">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">git_versions_from_keywords</code><span class="sig-paren">(</span><em class="sig-param">keywords</em>, <em class="sig-param">tag_prefix</em>, <em class="sig-param">verbose</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.git_versions_from_keywords" title="Permalink to this definition">¶</a></dt>
+<dd><p>Get version information from git keywords.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="plus-or-dot">
+<h2>plus_or_dot<a class="headerlink" href="#plus-or-dot" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.plus_or_dot">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">plus_or_dot</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.plus_or_dot" title="Permalink to this definition">¶</a></dt>
+<dd><p>Return a + if we don’t already have one, else return a .</p>
+</dd></dl>
+
+</div>
+<div class="section" id="register-vcs-handler">
+<h2>register_vcs_handler<a class="headerlink" href="#register-vcs-handler" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.register_vcs_handler">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">register_vcs_handler</code><span class="sig-paren">(</span><em class="sig-param">vcs</em>, <em class="sig-param">method</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.register_vcs_handler" title="Permalink to this definition">¶</a></dt>
+<dd><p>Decorator to mark a method as the handler for a particular VCS.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render">
+<h2>render<a class="headerlink" href="#render" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render</code><span class="sig-paren">(</span><em class="sig-param">pieces</em>, <em class="sig-param">style</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render" title="Permalink to this definition">¶</a></dt>
+<dd><p>Render the given version pieces into the requested style.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render-git-describe">
+<h2>render_git_describe<a class="headerlink" href="#render-git-describe" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render_git_describe">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render_git_describe</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render_git_describe" title="Permalink to this definition">¶</a></dt>
+<dd><p>TAG[-DISTANCE-gHEX][-dirty].</p>
+<p>Like ‘git describe –tags –dirty –always’.</p>
+<p>Exceptions:
+1: no tags. HEX[-dirty]  (note: no ‘g’ prefix)</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render-git-describe-long">
+<h2>render_git_describe_long<a class="headerlink" href="#render-git-describe-long" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render_git_describe_long">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render_git_describe_long</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render_git_describe_long" title="Permalink to this definition">¶</a></dt>
+<dd><p>TAG-DISTANCE-gHEX[-dirty].</p>
+<p>Like ‘git describe –tags –dirty –always -long’.
+The distance/hash is unconditional.</p>
+<p>Exceptions:
+1: no tags. HEX[-dirty]  (note: no ‘g’ prefix)</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render-pep440">
+<h2>render_pep440<a class="headerlink" href="#render-pep440" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render_pep440">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render_pep440</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render_pep440" title="Permalink to this definition">¶</a></dt>
+<dd><p>Build up version string, with post-release “local version identifier”.</p>
+<p>Our goal: TAG[+DISTANCE.gHEX[.dirty]] . Note that if you
+get a tagged build and then dirty it, you’ll get TAG+0.gHEX.dirty</p>
+<p>Exceptions:
+1: no tags. git_describe was just HEX. 0+untagged.DISTANCE.gHEX[.dirty]</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render-pep440-old">
+<h2>render_pep440_old<a class="headerlink" href="#render-pep440-old" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render_pep440_old">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render_pep440_old</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render_pep440_old" title="Permalink to this definition">¶</a></dt>
+<dd><p>TAG[.postDISTANCE[.dev0]] .</p>
+<p>The “.dev0” means dirty.</p>
+<p>Eexceptions:
+1: no tags. 0.postDISTANCE[.dev0]</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render-pep440-post">
+<h2>render_pep440_post<a class="headerlink" href="#render-pep440-post" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render_pep440_post">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render_pep440_post</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render_pep440_post" title="Permalink to this definition">¶</a></dt>
+<dd><p>TAG[.postDISTANCE[.dev0]+gHEX] .</p>
+<p>The “.dev0” means dirty. Note that .dev0 sorts backwards
+(a dirty tree will appear “older” than the corresponding clean one),
+but you shouldn’t be releasing software with -dirty anyways.</p>
+<p>Exceptions:
+1: no tags. 0.postDISTANCE[.dev0]</p>
+</dd></dl>
+
+</div>
+<div class="section" id="render-pep440-pre">
+<h2>render_pep440_pre<a class="headerlink" href="#render-pep440-pre" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.render_pep440_pre">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">render_pep440_pre</code><span class="sig-paren">(</span><em class="sig-param">pieces</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.render_pep440_pre" title="Permalink to this definition">¶</a></dt>
+<dd><p>TAG[.post.devDISTANCE] – No -dirty.</p>
+<p>Exceptions:
+1: no tags. 0.post.devDISTANCE</p>
+</dd></dl>
+
+</div>
+<div class="section" id="run-command">
+<h2>run_command<a class="headerlink" href="#run-command" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.run_command">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">run_command</code><span class="sig-paren">(</span><em class="sig-param">commands</em>, <em class="sig-param">args</em>, <em class="sig-param">cwd=None</em>, <em class="sig-param">verbose=False</em>, <em class="sig-param">hide_stderr=False</em>, <em class="sig-param">env=None</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.run_command" title="Permalink to this definition">¶</a></dt>
+<dd><p>Call the given command(s).</p>
+</dd></dl>
+
+</div>
+<div class="section" id="versions-from-parentdir">
+<h2>versions_from_parentdir<a class="headerlink" href="#versions-from-parentdir" title="Permalink to this headline">¶</a></h2>
+<dl class="function">
+<dt id="nibabel._version.versions_from_parentdir">
+<code class="sig-prename descclassname">nibabel._version.</code><code class="sig-name descname">versions_from_parentdir</code><span class="sig-paren">(</span><em class="sig-param">parentdir_prefix</em>, <em class="sig-param">root</em>, <em class="sig-param">verbose</em><span class="sig-paren">)</span><a class="headerlink" href="#nibabel._version.versions_from_parentdir" title="Permalink to this definition">¶</a></dt>
+<dd><p>Try to determine the version from the parent directory name.</p>
+<p>Source tarballs conventionally unpack into a directory that includes both
+the project name and a version string. We will also support searching up
+two directory levels for an appropriately named parent directory</p>
+</dd></dl>
+
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer" role="contentinfo">
+        &#169; Copyright 2006-2020, Chris Markiewicz &lt;neuroimaging@python.org&gt;.
+      Created using <a href="http://sphinx-doc.org/">Sphinx</a> 2.2.0.
+    </div>
+  </body>
+</html>

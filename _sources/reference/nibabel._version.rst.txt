@@ -1,0 +1,141 @@
+.. AUTO-GENERATED FILE -- DO NOT EDIT!
+
+:mod:`_version`
+===============
+.. automodule:: nibabel._version
+
+.. currentmodule:: nibabel._version
+.. autosummary::
+
+   NotThisMethod
+   VersioneerConfig
+   get_config
+   get_keywords
+   get_versions
+   git_get_keywords
+   git_pieces_from_vcs
+   git_versions_from_keywords
+   plus_or_dot
+   register_vcs_handler
+   render
+   render_git_describe
+   render_git_describe_long
+   render_pep440
+   render_pep440_old
+   render_pep440_post
+   render_pep440_pre
+   run_command
+   versions_from_parentdir
+
+
+.. currentmodule:: nibabel._version
+
+
+:class:`NotThisMethod`
+~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. autoclass:: NotThisMethod
+  :members:
+  :undoc-members:
+  :show-inheritance:
+
+  .. automethod:: __init__
+
+
+:class:`VersioneerConfig`
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+
+.. autoclass:: VersioneerConfig
+  :members:
+  :undoc-members:
+  :show-inheritance:
+
+  .. automethod:: __init__
+
+get_config
+~~~~~~~~~~
+
+.. autofunction:: get_config
+
+get_keywords
+~~~~~~~~~~~~
+
+.. autofunction:: get_keywords
+
+get_versions
+~~~~~~~~~~~~
+
+.. autofunction:: get_versions
+
+git_get_keywords
+~~~~~~~~~~~~~~~~
+
+.. autofunction:: git_get_keywords
+
+git_pieces_from_vcs
+~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: git_pieces_from_vcs
+
+git_versions_from_keywords
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: git_versions_from_keywords
+
+plus_or_dot
+~~~~~~~~~~~
+
+.. autofunction:: plus_or_dot
+
+register_vcs_handler
+~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: register_vcs_handler
+
+render
+~~~~~~
+
+.. autofunction:: render
+
+render_git_describe
+~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: render_git_describe
+
+render_git_describe_long
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: render_git_describe_long
+
+render_pep440
+~~~~~~~~~~~~~
+
+.. autofunction:: render_pep440
+
+render_pep440_old
+~~~~~~~~~~~~~~~~~
+
+.. autofunction:: render_pep440_old
+
+render_pep440_post
+~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: render_pep440_post
+
+render_pep440_pre
+~~~~~~~~~~~~~~~~~
+
+.. autofunction:: render_pep440_pre
+
+run_command
+~~~~~~~~~~~
+
+.. autofunction:: run_command
+
+versions_from_parentdir
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. autofunction:: versions_from_parentdir
+
