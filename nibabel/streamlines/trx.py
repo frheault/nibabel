@@ -1,16 +1,21 @@
-import os
 import json
-import zipfile
 import mmap
-import tempfile
-from time import sleep
+import os
 import shutil
+import tempfile
+import zipfile
 
 from nibabel.streamlines.array_sequence import ArraySequence
 import numpy as np
 
 
 def load(input_obj):
+    # Check if 0 streamlines, if yes then 0 points is expected (vice-versa)
+    # 4x4 affine matrices should contains values (no all-zeros)
+    # 3x1 dimensions array should contains values at each position (int)
+    # Catch the error if filename do not have a dtype extension (support bool?)
+    #
+
     if os.path.isfile(input_obj):
         was_compressed = False
         with zipfile.ZipFile(input_obj, 'r') as zf:
@@ -30,6 +35,7 @@ def load(input_obj):
     elif os.path.isdir(input_obj):
         trx = load_from_directory(input_obj)
 
+    # Example of robust check for metadata
     for dpg in trx.data_per_group.keys():
         if dpg not in trx.groups.keys():
             raise ValueError('An undeclared group ({}) has data_per_group.'.format(
@@ -48,24 +54,19 @@ def load_from_zip(filename):
             trx.nbr_streamlines = trx.header['nbr_streamlines']
 
         files_pointer_size = {}
-        zip_mm = open(filename, 'r+')
-        mm = mmap.mmap(zip_mm.fileno(), 0)
-
         for zip_info in zf.filelist:
             elem_filename = zip_info.filename
             if elem_filename == 'header.json':
                 continue
             _, ext = os.path.splitext(elem_filename)
 
-            with zf.open(elem_filename) as zf_file:
-                first_bytes = zf_file.readline()
-                mem_adress = mm.find(first_bytes)
-                size = zip_info.file_size / np.dtype(ext[1:]).itemsize
+            mem_adress = zip_info.header_offset + len(zip_info.FileHeader())
+            size = zip_info.file_size / np.dtype(ext[1:]).itemsize
 
-                if size.is_integer():
-                    files_pointer_size[elem_filename] = mem_adress, int(size)
-                else:
-                    raise ValueError('Wrong size or datatype')
+            if size.is_integer():
+                files_pointer_size[elem_filename] = mem_adress, int(size)
+            else:
+                raise ValueError('Wrong size or datatype')
 
     return create_trx_from_memmap(trx, files_pointer_size, root_zip=filename)
 
@@ -113,24 +114,24 @@ def create_trx_from_memmap(trx, dict_pointer_size, root_zip=None, root=None):
             if base == 'data':
                 if size != trx.nbr_points*3:
                     raise ValueError('Wrong data size')
-                trx._data = np.memmap(filename, mode='r',
-                                      offset=mem_adress,
-                                      shape=(trx.nbr_points, 3),
-                                      dtype=ext[1:])
+                data = np.memmap(filename, mode='r',
+                                 offset=mem_adress,
+                                 shape=(trx.nbr_points, 3),
+                                 dtype=ext[1:])
             elif base == 'offsets':
                 if size != trx.nbr_streamlines:
                     raise ValueError('Wrong offsets size')
-                trx._offsets = np.memmap(filename, mode='r',
-                                         offset=mem_adress,
-                                         shape=(trx.nbr_streamlines,),
-                                         dtype=ext[1:])
+                offsets = np.memmap(filename, mode='r',
+                                    offset=mem_adress,
+                                    shape=(trx.nbr_streamlines,),
+                                    dtype=ext[1:])
             elif base == 'lengths':
                 if size != trx.nbr_streamlines:
                     raise ValueError('Wrong lengths size')
-                trx._lengths = np.memmap(filename, mode='r',
-                                         offset=mem_adress,
-                                         shape=(trx.nbr_streamlines,),
-                                         dtype=ext[1:])
+                lengths = np.memmap(filename, mode='r',
+                                    offset=mem_adress,
+                                    shape=(trx.nbr_streamlines,),
+                                    dtype=ext[1:])
         else:
             if folder == 'dps':
                 if size != trx.nbr_streamlines:
@@ -160,13 +161,13 @@ def create_trx_from_memmap(trx, dict_pointer_size, root_zip=None, root=None):
                     filename, mode='r', offset=mem_adress,
                     shape=(size,), dtype=ext[1:])
 
-    if trx._data is not None \
-        and trx._offsets is not None \
-            and trx._lengths is not None:
+    if data is not None \
+        and offsets is not None \
+            and lengths is not None:
         trx.streamlines = ArraySequence()
-        trx.streamlines._data = trx._data
-        trx.streamlines._offsets = trx._offsets
-        trx.streamlines._lengths = trx._lengths
+        trx.streamlines._data = data
+        trx.streamlines._offsets = offsets
+        trx.streamlines._lengths = lengths
     else:
         raise ValueError('Missing essential data')
 
@@ -174,8 +175,8 @@ def create_trx_from_memmap(trx, dict_pointer_size, root_zip=None, root=None):
         tmp = trx.data_per_point[dpp_key]
         trx.data_per_point[dpp_key] = ArraySequence()
         trx.data_per_point[dpp_key]._data = tmp
-        trx.data_per_point[dpp_key]._offsets = trx._offsets
-        trx.data_per_point[dpp_key]._lengths = trx._lengths
+        trx.data_per_point[dpp_key]._offsets = offsets
+        trx.data_per_point[dpp_key]._lengths = lengths
 
     return trx
 
@@ -187,9 +188,12 @@ def save(trx, filename):
         with open(os.path.join(tmp_dir, 'header.json'), 'w') as out_json:
             json.dump(trx.header, out_json)
 
-        trx._data.tofile(os.path.join(tmp_dir, 'data.{}'.format(trx._data.dtype.name)))
-        trx._offsets.tofile(os.path.join(tmp_dir, 'offsets.{}'.format(trx._offsets.dtype.name)))
-        trx._lengths.tofile(os.path.join(tmp_dir, 'lengths.{}'.format(trx._lengths.dtype.name)))
+        trx.streamlines._data.tofile(os.path.join(tmp_dir, 'data.{}'.format(
+            trx.streamlines._data.dtype.name)))
+        trx.streamlines._offsets.tofile(os.path.join(tmp_dir, 'offsets.{}'.format(
+            trx.streamlines._offsets.dtype.name)))
+        trx.streamlines._lengths.tofile(os.path.join(tmp_dir, 'lengths.{}'.format(
+            trx.streamlines._lengths.dtype.name)))
 
         if len(trx.data_per_point.keys()) > 0:
             os.mkdir(os.path.join(tmp_dir, 'dpp/'))
@@ -241,9 +245,6 @@ class TrxFile():
     def __init__(self):
         self.header = None
         self.streamlines = []
-        self._data = None
-        self._offsets = None
-        self._lengths = None
         self.groups = {}
         self.data_per_streamline = {}
         self.data_per_point = {}
