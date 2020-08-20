@@ -10,6 +10,7 @@ from .tractogram_file import ExtensionWarning
 
 from .trk import TrkFile
 from .tck import TckFile
+from .trx import TrxFile
 
 # List of all supported formats
 FORMATS = {".trk": TrkFile,
