@@ -8,14 +8,12 @@ from .array_sequence import ArraySequence
 from .tractogram import Tractogram, LazyTractogram
 from .tractogram_file import ExtensionWarning
 
-from .trk import TrkFile
-from .tck import TckFile
-from .trx import TrxFile
+from nibabel.streamlines.trk import TrkFile
+from nibabel.streamlines.tck import TckFile
 
 # List of all supported formats
 FORMATS = {".trk": TrkFile,
-           ".tck": TckFile
-           }
+           ".tck": TckFile}
 
 
 def is_supported(fileobj):

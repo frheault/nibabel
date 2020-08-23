@@ -5,7 +5,12 @@ import shutil
 import tempfile
 import zipfile
 
+from dipy.io.stateful_tractogram import StatefulTractogram, Space
+from dipy.io.streamline import load_tractogram
+from nibabel.affines import voxel_sizes
+from nibabel.orientations import aff2axcodes
 from nibabel.streamlines.array_sequence import ArraySequence
+
 import numpy as np
 
 
@@ -14,7 +19,6 @@ def load(input_obj):
     # 4x4 affine matrices should contains values (no all-zeros)
     # 3x1 dimensions array should contains values at each position (int)
     # Catch the error if filename do not have a dtype extension (support bool?)
-    #
 
     if os.path.isfile(input_obj):
         was_compressed = False
@@ -230,6 +234,8 @@ def save(trx, filename):
         if os.path.splitext(filename)[1]:
             zip_from_folder(tmp_dir, filename)
         else:
+            if os.path.isdir(filename):
+                shutil.rmtree(filename)
             shutil.copytree(tmp_dir, filename)
 
 
@@ -251,6 +257,35 @@ class TrxFile():
         self.data_per_group = {}
 
         self._uncompressed_folder_handle = None
+
+    @staticmethod
+    def from_sft(sft):
+        trx = TrxFile()
+        trx.header = {'dimensions': sft.dimensions.tolist(),
+                      'affine': sft.affine.tolist(),
+                      'nbr_points': len(sft.streamlines.get_data()),
+                      'nbr_streamlines': len(sft.streamlines)}
+        trx.streamlines = sft.streamlines
+        trx.data_per_streamline = sft.data_per_streamline
+        trx.data_per_point = sft.data_per_point
+
+        tmpdir = tempfile.TemporaryDirectory()
+        save(trx, tmpdir.name)
+        trx = load_from_directory(tmpdir.name)
+        trx._uncompressed_folder_handle = tmpdir
+
+        return trx
+
+    def to_sft(self):
+        affine = np.array(self.header['affine'], dtype=np.float32)
+        dimensions = np.array(self.header['dimensions'], dtype=np.uint16)
+        vox_sizes = np.array(voxel_sizes(affine), dtype=np.float32)
+        vox_order = ''.join(aff2axcodes(affine))
+        space_attributes = (affine, dimensions, vox_sizes, vox_order)
+        sft = StatefulTractogram(self.streamlines, space_attributes, Space.RASMM,
+                                 data_per_point=self.data_per_point,
+                                 data_per_streamline=self.data_per_streamline)
+        return sft
 
     def close(self):
         if self._uncompressed_folder_handle is not None:
