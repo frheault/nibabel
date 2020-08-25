@@ -407,7 +407,6 @@ def zip_from_folder(directory, filename):
                 tmp_filename = os.path.join(root, name)
                 zf.write(tmp_filename, tmp_filename.replace(directory+'/', ''))
 
-
 class TrxFile():
     def __init__(self, nbr_points=None, nbr_streamlines=None, init_as=None,
                  reference=None):
@@ -506,7 +505,7 @@ class TrxFile():
         return trx
 
     def resize(self, nbr_streamlines=None, nbr_points=None, delete_dpg=False):
-        if len(self.streamlines):
+        if np.any(self.streamlines._offsets):
             real_nbr_streamlines = int(np.nonzero(self.streamlines._offsets)[0][-1]+1)
             if nbr_streamlines is not None and nbr_streamlines < real_nbr_streamlines:
                 real_nbr_streamlines = nbr_streamlines
@@ -543,54 +542,58 @@ class TrxFile():
 
         tmp_dir = trx._uncompressed_folder_handle
         if len(self.groups.keys()) > 0:
-            os.mkdir(os.path.join(tmp_dir, 'groups/'))
+            os.mkdir(os.path.join(tmp_dir.name, 'groups/'))
 
         if len(trx.data_per_group.keys()) > 0:
-            os.mkdir(os.path.join(tmp_dir, 'dpg/'))
+            os.mkdir(os.path.join(tmp_dir.name, 'dpg/'))
 
         for group_key in self.groups.keys():
             group_dtype = self.groups[group_key].dtype
-            group_name = os.path.join(tmp_dir, 'groups/',
+            group_name = os.path.join(tmp_dir.name, 'groups/',
                                       '{}.{}'.format(group_key,
                                                      group_dtype.name))
-            tmp = self.groups[group][self.groups[group] < real_nbr_streamlines]
+            tmp = self.groups[group_key][self.groups[group_key] < real_nbr_streamlines]
             trx.groups[group_key] = _create_memmap(group_name, mode='w+',
                                                    shape=(len(tmp),), dtype=group_dtype)
             trx.groups[group_key][:] = tmp
 
             if not delete_dpg:
-                for dpg_key in self.data_per_group[group_key].keys():
-                    dpg_dtype = self.data_per_group[group_key][dpg_key].dtype
-                    dpg_name = os.path.join(tmp_dir, 'dpg/', group_key,
-                                            '{}.{}'.format(dpg_key,
-                                                           dpg_dtype.name))
-                if group_key not in trx.self.data_per_group[group_key]:
-                    trx.self.data_per_group[group_key] = {}
-                trx.self.data_per_group[group_key][dpg_key] = _create_memmap(dpg_name, mode='w+',
-                                                                             shape=(1,), dtype=dpg_dtype)
+                if group_key not in trx.data_per_group:
+                    self.data_per_group[group_key] = {}
+                    for dpg_key in self.data_per_group[group_key].keys():
+                        dpg_dtype = self.data_per_group[group_key][dpg_key].dtype
+                        dpg_name = os.path.join(tmp_dir.name, 'dpg/', group_key,
+                                                '{}.{}'.format(dpg_key,
+                                                            dpg_dtype.name))
+                        if dpg_key not in trx.data_per_group[group_key]:
+                            trx.data_per_group[group_key] = {}
+                        trx.data_per_group[group_key][dpg_key] = _create_memmap(dpg_name, mode='w+',
+                                                                                    shape=(1,), dtype=dpg_dtype)
 
-                trx.self.data_per_group[group_key][dpg_key][:
-                                                            ] = self.self.data_per_group[group_key][dpg_key]
+                        trx.data_per_group[group_key][dpg_key][:
+                                                                    ] = self.self.data_per_group[group_key][dpg_key]
 
         self.close()
         self.__dict__ = trx.__dict__
 
+    
     def append(self, trx, buffer_size=0):
-        if len(self.streamlines):
+        if np.any(self.streamlines._offsets):
             real_size = int(np.nonzero(self.streamlines._offsets)[0][-1]+1)
             real_point_size = int(np.sum(self.streamlines._lengths))
         else:
             real_size = 0
             real_point_size = 0
-
+        print('alloc', self.header['nbr_points'], self.header['nbr_streamlines'])
         nbr_points = real_point_size + trx.header['nbr_points']
         nbr_streamlines = real_size + trx.header['nbr_streamlines']
         if self.header['nbr_points'] < nbr_points \
                 or self.header['nbr_streamlines'] < nbr_streamlines:
             self.resize(nbr_streamlines=nbr_streamlines+buffer_size,
                         nbr_points=nbr_points+buffer_size*100)
-            _ = concatenate([self, trx], preallocation_count=0,
-                            delete_dpg=True, delete_groups=True)
+            print('OF')
+        _ = concatenate([self, trx], preallocation_count=0,
+                        delete_dpg=True, delete_groups=True)
 
     @ staticmethod
     def from_sft(sft):
