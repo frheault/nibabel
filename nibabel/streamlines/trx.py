@@ -17,6 +17,23 @@ import numpy as np
 # TODO rename data -> position
 # TODO Eliminate the need for length as input (check time)
 # TODO Catch the error if filename do not have a dtype extension (support bool?)
+# TODO verify group and data per group
+
+
+def _dichotomic_search(x, l_bound=None, r_bound=None):
+    if l_bound is None and r_bound is None:
+        l_bound = 0
+        r_bound = len(x)-1
+
+    if l_bound == r_bound:
+        val = l_bound if x[l_bound] != 0 else -1
+        return val
+
+    mid_bound = (l_bound + r_bound + 1) // 2
+    if x[mid_bound] == 0:
+        return _dichotomic_search(x, l_bound, mid_bound-1)
+    else:
+        return _dichotomic_search(x, mid_bound, r_bound)
 
 
 def _create_memmap(filename, mode='r', shape=(1,), dtype=np.float32, offset=0):
@@ -64,6 +81,9 @@ def load(input_obj, check_dpg=True):
                                  'data_per_group.'.format(dpg))
 
     return trx
+
+
+from time import time
 
 
 def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=False,
@@ -137,15 +157,15 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=Fals
                         raise ValueError('Shared group key, has different dtype.')
 
     # Once the checks are done, actually concatenate
-    nbr_points = 0
-    nbr_streamlines = 0
     to_concat_list = trx_list[1:] if preallocation else trx_list
-    for curr_trx in to_concat_list:
-        curr_strs_len, curr_pts_len = curr_trx._get_real_size()
-        nbr_streamlines += curr_strs_len
-        nbr_points += curr_pts_len
-
     if not preallocation:
+        nbr_points = 0
+        nbr_streamlines = 0
+        for curr_trx in to_concat_list:
+            curr_strs_len, curr_pts_len = curr_trx._get_real_size()
+            nbr_streamlines += curr_strs_len
+            nbr_points += curr_pts_len
+
         new_trx = TrxFile(nbr_points=nbr_points, nbr_streamlines=nbr_streamlines,
                           init_as=ref_trx)
         tmp_dir = new_trx._uncompressed_folder_handle.name
@@ -183,7 +203,6 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=Fals
         strs_end, pts_end = new_trx._copy_fixed_arrays_from(curr_trx,
                                                             strs_start=strs_end,
                                                             pts_start=pts_end)
-
     return new_trx
 
 
@@ -512,14 +531,16 @@ class TrxFile():
         return trx
 
     def _get_real_size(self):
-        if np.any(self.streamlines._offsets):
-            strs_end = int(np.nonzero(self.streamlines._offsets)[0][-1]+1)
-            pts_end = int(np.sum(self.streamlines._lengths[0:strs_end]))
-        else:
-            strs_end = 0
-            pts_end = 0
+        if len(self.streamlines._lengths) == 0:
+            return 0, 0
 
-        return strs_end, pts_end
+        last_elem_pos = _dichotomic_search(self.streamlines._lengths)
+        if last_elem_pos != -1:
+            strs_end = int(last_elem_pos+1)
+            pts_end = int(np.sum(self.streamlines._lengths[0:strs_end]))
+            return strs_end, pts_end
+
+        return 0, 0
 
     def resize(self, nbr_streamlines=None, nbr_points=None, delete_dpg=False):
         strs_end, pts_end = self._get_real_size()
@@ -542,6 +563,7 @@ class TrxFile():
             nbr_points = pts_end
         elif nbr_points < pts_end:
             logging.warning('Cannot resize (down) points for consistency.')
+            return
 
         trx = self._initialize_empty_trx(nbr_streamlines, nbr_points, init_as=self)
         trx.header['affine'] = self.header['affine']
@@ -568,7 +590,8 @@ class TrxFile():
                                       '{}.{}'.format(group_key,
                                                      group_dtype.name))
             ori_len = self.groups[group_key]
-            tmp = self.groups[group_key][self.groups[group_key] < strs_start]
+
+            tmp = self.groups[group_key][self.groups[group_key] < strs_end]
             trx.groups[group_key] = _create_memmap(group_name, mode='w+',
                                                    shape=(len(tmp),),
                                                    dtype=group_dtype)
@@ -590,11 +613,10 @@ class TrxFile():
                                                                dpg_dtype.name))
                         if dpg_key not in trx.data_per_group[group_key]:
                             trx.data_per_group[group_key] = {}
-                        trx.data_per_group[group_key][dpg_key] = \
-                            _create_memmap(dpg_name, mode='w+', shape=(1,),
-                                           dtype=dpg_dtype)
+                        trx.data_per_group[group_key][dpg_key] = _create_memmap(dpg_name, mode='w+', shape=(1,),
+                                                                                dtype=dpg_dtype)
 
-                        trx.data_per_group[group_key][dpg_key][:] \
+                        trx.data_per_group[group_key][dpg_key][:]\
                             = self.self.data_per_group[group_key][dpg_key]
 
         self.close()
@@ -606,26 +628,21 @@ class TrxFile():
         pts_end = pts_start + curr_pts_len
 
         # Mandatory arrays
-        self.streamlines._data[pts_start:pts_end] \
+        self.streamlines._data[pts_start:pts_end]\
             = trx.streamlines._data[0:curr_pts_len]
-        self.streamlines._offsets[strs_start:strs_end] = \
-            trx.streamlines._offsets[0:curr_strs_len] + pts_start
-        self.streamlines._lengths[strs_start:strs_end] = \
-            trx.streamlines._lengths[0:curr_strs_len]
+        self.streamlines._offsets[strs_start:strs_end] = trx.streamlines._offsets[0:curr_strs_len] + pts_start
+        self.streamlines._lengths[strs_start:strs_end] = trx.streamlines._lengths[0:curr_strs_len]
 
         # Optional fixed-sized arrays
         for dpp_key in self.data_per_point.keys():
-            self.data_per_point[dpp_key]._data[pts_start:pts_end] = \
-                trx.data_per_point[dpp_key]._data[0:curr_pts_len]
-            self.data_per_point[dpp_key]._offsets[strs_start:strs_end] = \
-                trx.streamlines._offsets[0:curr_strs_len] + pts_start
-            self.data_per_point[dpp_key]._lengths[strs_start:strs_end] = \
-                trx.streamlines._lengths[0:curr_strs_len]
+            self.data_per_point[dpp_key]._data[pts_start:
+                                               pts_end] = trx.data_per_point[dpp_key]._data[0:curr_pts_len]
+            self.data_per_point[dpp_key]._offsets = self.streamlines._offsets
+            self.data_per_point[dpp_key]._lengths = self.streamlines._lengths
 
         for dps_key in self.data_per_streamline.keys():
-            self.data_per_streamline[dps_key][strs_start:strs_end] \
+            self.data_per_streamline[dps_key][strs_start:strs_end]\
                 = trx.data_per_streamline[dps_key][0:curr_strs_len]
-
         return strs_end, pts_end
 
     def append(self, trx, buffer_size=0):
@@ -633,17 +650,17 @@ class TrxFile():
 
         nbr_streamlines = strs_end + trx.header['nbr_streamlines']
         nbr_points = pts_end + trx.header['nbr_points']
+
         if self.header['nbr_streamlines'] < nbr_streamlines \
                 or self.header['nbr_points'] < nbr_points:
             self.resize(nbr_streamlines=nbr_streamlines+buffer_size,
                         nbr_points=nbr_points+buffer_size*100)
             _ = concatenate([self, trx], preallocation=True,
                             delete_groups=True)
-        else:
-            trx = concatenate([self, trx], preallocation=False,
-                              delete_groups=False)
-            self.close()
-            self.__dict__ = trx.__dict__
+        elif self.header['nbr_streamlines'] > nbr_streamlines \
+                and self.header['nbr_points'] > nbr_points:
+            _ = concatenate([self, trx], preallocation=True,
+                            delete_groups=True)
 
     @ staticmethod
     def from_sft(sft):
