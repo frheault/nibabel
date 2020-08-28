@@ -83,9 +83,6 @@ def load(input_obj, check_dpg=True):
     return trx
 
 
-from time import time
-
-
 def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=False,
                 check_space_attributes=True, preallocation=False):
     ref_trx = trx_list[0]
@@ -553,17 +550,18 @@ class TrxFile():
                 logging.warning('Keeping the appropriate points count for '
                                 'consistency, overwritting provided parameters.')
 
-        if nbr_streamlines is None:
-            nbr_streamlines = strs_end
-            if nbr_streamlines == self.header['nbr_streamlines']:
-                logging.debug('TrxFile of the right size, no resizing.')
-                return
-
         if nbr_points is None:
             nbr_points = pts_end
         elif nbr_points < pts_end:
             logging.warning('Cannot resize (down) points for consistency.')
             return
+
+        if nbr_streamlines is None:
+            nbr_streamlines = strs_end
+            if nbr_streamlines == self.header['nbr_streamlines'] \
+                    and nbr_points == self.header['nbr_points']:
+                logging.debug('TrxFile of the right size, no resizing.')
+                return
 
         trx = self._initialize_empty_trx(nbr_streamlines, nbr_points, init_as=self)
         trx.header['affine'] = self.header['affine']
@@ -630,13 +628,15 @@ class TrxFile():
         # Mandatory arrays
         self.streamlines._data[pts_start:pts_end]\
             = trx.streamlines._data[0:curr_pts_len]
-        self.streamlines._offsets[strs_start:strs_end] = trx.streamlines._offsets[0:curr_strs_len] + pts_start
-        self.streamlines._lengths[strs_start:strs_end] = trx.streamlines._lengths[0:curr_strs_len]
+        self.streamlines._offsets[strs_start:strs_end] = \
+            trx.streamlines._offsets[0:curr_strs_len] + pts_start
+        self.streamlines._lengths[strs_start:strs_end] = \
+            trx.streamlines._lengths[0:curr_strs_len]
 
         # Optional fixed-sized arrays
         for dpp_key in self.data_per_point.keys():
-            self.data_per_point[dpp_key]._data[pts_start:
-                                               pts_end] = trx.data_per_point[dpp_key]._data[0:curr_pts_len]
+            self.data_per_point[dpp_key]._data[pts_start:pts_end] = \
+                trx.data_per_point[dpp_key]._data[0:curr_pts_len]
             self.data_per_point[dpp_key]._offsets = self.streamlines._offsets
             self.data_per_point[dpp_key]._lengths = self.streamlines._lengths
 
@@ -655,12 +655,8 @@ class TrxFile():
                 or self.header['nbr_points'] < nbr_points:
             self.resize(nbr_streamlines=nbr_streamlines+buffer_size,
                         nbr_points=nbr_points+buffer_size*100)
-            _ = concatenate([self, trx], preallocation=True,
-                            delete_groups=True)
-        elif self.header['nbr_streamlines'] > nbr_streamlines \
-                and self.header['nbr_points'] > nbr_points:
-            _ = concatenate([self, trx], preallocation=True,
-                            delete_groups=True)
+        _ = concatenate([self, trx], preallocation=True,
+                        delete_groups=True)
 
     @ staticmethod
     def from_sft(sft):
