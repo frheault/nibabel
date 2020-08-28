@@ -12,7 +12,11 @@ from nibabel.orientations import aff2axcodes
 from nibabel.streamlines.array_sequence import ArraySequence
 
 import numpy as np
-# TODO fuse _create_from_memmap with alloc of concat with save?
+# TODO fuse Move the save to class function
+# TODO minimal docstring
+# TODO rename data -> position
+# TODO Eliminate the need for length as input (check time)
+# TODO Catch the error if filename do not have a dtype extension (support bool?)
 
 
 def _create_memmap(filename, mode='r', shape=(1,), dtype=np.float32, offset=0):
@@ -30,7 +34,6 @@ def load(input_obj, check_dpg=True):
     # Check if 0 streamlines, if yes then 0 points is expected (vice-versa)
     # 4x4 affine matrices should contains values (no all-zeros)
     # 3x1 dimensions array should contains values at each position (int)
-    # Catch the error if filename do not have a dtype extension (support bool?)
     if os.path.isfile(input_obj):
         was_compressed = False
         with zipfile.ZipFile(input_obj, 'r') as zf:
@@ -63,8 +66,7 @@ def load(input_obj, check_dpg=True):
     return trx
 
 
-def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_dpg=False,
-                delete_groups=False,
+def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=False,
                 check_space_attributes=True, preallocation=False):
     ref_trx = trx_list[0]
 
@@ -74,14 +76,11 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_dpg=False,
                     or not np.array_equal(ref_trx.header['dimensions'], curr_trx.header['dimensions']):
                 raise ValueError('Wrong space attributes.')
 
-    if preallocation and not (delete_groups and delete_dpg):
+    if preallocation and not delete_groups:
         raise ValueError('Groups are variables, cannot be handled with '
                          'preallocation')
 
-    if delete_groups:
-        delete_dpg = True
-
-    # Verifying the validity of dpp/dps, coherence between input
+    # Verifying the validity of fixed-size arrays, coherence between inputs
     for curr_trx in trx_list[1:]:
         for key in curr_trx.data_per_point.keys():
             if key not in ref_trx.data_per_point.keys():
@@ -112,7 +111,8 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_dpg=False,
 
     all_groups_len = {}
     all_groups_dtype = {}
-    if not (delete_groups and delete_dpg):
+    # Variable-size arrays do not have to exist in all TrxFile
+    if not delete_groups:
         for trx_1 in trx_list:
             for group_key in trx_1.groups.keys():
                 # Concatenating groups together
@@ -122,26 +122,21 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_dpg=False,
                     all_groups_len[group_key] = len(trx_1.groups[group_key])
                     all_groups_dtype[group_key] = trx_1.groups[group_key].dtype
 
-                # Groups can exist in one, some or all TrxFile.
-                # However, data_per_group cannot be easily 'fused'.
-                for trx_2 in trx_list:
-                    if group_key in trx_1.data_per_group \
-                            and group_key in trx_2.data_per_group:
-                        if trx_1.groups[group_key].dtype \
-                                != trx_2.groups[group_key].dtype:
-                            logging.debug('{} group key is not declared with '
-                                          'the same dtype in all TrxFile.'.format(
-                                              key))
-                            raise ValueError('Shared group key, has different dtype.')
-                        for dpg_key in trx_1.data_per_group[group_key].keys():
-                            if dpg_key in trx_2.data_per_group[group_key] \
-                                    and not delete_dpg:
-                                logging.debug('{} dpg key is shared, cannot '
-                                              'concatenate this information.'.format(
-                                                  dpg_key))
-                                raise ValueError('Shared dpg keys, cannot '
-                                                 'concatenate, use delete_dpg.')
+                if len(trx_1.data_per_group.keys()) > 0:
+                    logging.warning('TrxFile contains data_per_group, this '
+                                    'information cannot be easily concatenated, it '
+                                    'will be deleted.')
 
+                # data_per_group cannot be easily 'fused', so they are discarded
+                for trx_2 in trx_list:
+                    if trx_1.groups[group_key].dtype \
+                                != trx_2.groups[group_key].dtype:
+                        logging.debug('{} group key is not declared with '
+                                      'the same dtype in all TrxFile.'.format(
+                                                key))
+                        raise ValueError('Shared group key, has different dtype.')
+
+    # Once the checks are done, actually concatenate
     nbr_points = 0
     nbr_streamlines = 0
     to_concat_list = trx_list[1:] if preallocation else trx_list
@@ -178,26 +173,6 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_dpg=False,
                 pos += curr_len
                 count += curr_trx.header['nbr_streamlines']
 
-                if delete_dpg:
-                    continue
-                for group_key in curr_trx.data_per_group.keys():
-                    if not os.path.isdir(os.path.join(tmp_dir, 'dpg/')):
-                        os.mkdir(os.path.join(tmp_dir, 'dpg/'))
-                    for dpg_key in curr_trx.data_per_group[group_key].keys():
-                        if not os.path.isdir(os.path.join(tmp_dir, 'dpg/',
-                                                          dpg_key)):
-                            os.mkdir(os.path.join(tmp_dir, 'dpg/', dpg_key))
-                        if group_key not in new_trx.data_per_group:
-                            new_trx.data_per_group[group_key] = {}
-                        dtype = curr_trx.data_per_group[group_key][dpg_key].dtype
-                        dpg_filename = os.path.join(tmp_dir, 'dpg/', group_key,
-                                                    '{}.{}'.format(dpg_key,
-                                                                   dtype.name))
-                        new_trx.data_per_group[group_key][dpg_key] \
-                            = _create_memmap(dpg_filename, mode='w+',
-                                             shape=(1,), dtype=dtype)
-                        new_trx.data_per_group[group_key][dpg_key][:] \
-                            = curr_trx.data_per_group[group_key][dpg_key]
         strs_end, pts_end = 0, 0
     else:
         new_trx = ref_trx
@@ -205,9 +180,9 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_dpg=False,
 
     for curr_trx in to_concat_list:
         # Copy the TrxFile fixed-size info (the right chunk)
-        strs_end, pts_end = new_trx._copy_fixed_array_from(curr_trx,
-                                                        strs_start=strs_end,
-                                                        pts_start=pts_end)
+        strs_end, pts_end = new_trx._copy_fixed_arrays_from(curr_trx,
+                                                            strs_start=strs_end,
+                                                            pts_start=pts_end)
 
     return new_trx
 
@@ -391,6 +366,7 @@ class TrxFile():
         logging.debug('Initializing lengths with dtype: {}'.format(
             lengths_dtype.name))
 
+        # A TrxFile without init_as only contain the essential arrays
         data_filename = os.path.join(tmp_dir.name,
                                      'data.{}'.format(data_dtype.name))
         trx.streamlines._data = _create_memmap(data_filename, mode='w+',
@@ -409,7 +385,7 @@ class TrxFile():
                                                   shape=(nbr_streamlines,),
                                                   dtype=lengths_dtype)
 
-        # A TrxFile without init_as only contain the essential arrays
+        # Only the structure of fixed-size arrays is copied
         if init_as is not None:
             if len(init_as.data_per_point.keys()) > 0:
                 os.mkdir(os.path.join(tmp_dir.name, 'dpp/'))
@@ -509,9 +485,10 @@ class TrxFile():
                     filename, mode='r+', offset=mem_adress,
                     shape=(1,), dtype=ext[1:])
             elif folder == 'groups':
-                trx.groups[base] = _create_memmap(
-                    filename, mode='r+', offset=mem_adress,
-                    shape=(size,), dtype=ext[1:])
+                trx.groups[base] = _create_memmap(filename, mode='r+',
+                                                  offset=mem_adress,
+                                                  shape=(size,),
+                                                  dtype=ext[1:])
             else:
                 raise ValueError('Incorrect structure, cannot parse.')
 
@@ -579,15 +556,15 @@ class TrxFile():
 
         # Copy the fixed-sized info from the original TrxFile to the new
         # (resized) one.
-        trx._copy_fixed_array_from(self)
+        trx._copy_fixed_arrays_from(self)
 
-        tmp_dir = trx._uncompressed_folder_handle
+        tmp_dir = trx._uncompressed_folder_handle.name
         if len(self.groups.keys()) > 0:
-            os.mkdir(os.path.join(tmp_dir.name, 'groups/'))
+            os.mkdir(os.path.join(tmp_dir, 'groups/'))
 
         for group_key in self.groups.keys():
             group_dtype = self.groups[group_key].dtype
-            group_name = os.path.join(tmp_dir.name, 'groups/',
+            group_name = os.path.join(tmp_dir, 'groups/',
                                       '{}.{}'.format(group_key,
                                                      group_dtype.name))
             ori_len = self.groups[group_key]
@@ -602,13 +579,13 @@ class TrxFile():
 
             if not delete_dpg:
                 if len(trx.data_per_group.keys()) > 0:
-                    os.mkdir(os.path.join(tmp_dir.name, 'dpg/'))
+                    os.mkdir(os.path.join(tmp_dir, 'dpg/'))
 
                 if group_key not in trx.data_per_group:
                     self.data_per_group[group_key] = {}
                     for dpg_key in self.data_per_group[group_key].keys():
                         dpg_dtype = self.data_per_group[group_key][dpg_key].dtype
-                        dpg_name = os.path.join(tmp_dir.name, 'dpg/', group_key,
+                        dpg_name = os.path.join(tmp_dir, 'dpg/', group_key,
                                                 '{}.{}'.format(dpg_key,
                                                                dpg_dtype.name))
                         if dpg_key not in trx.data_per_group[group_key]:
@@ -623,9 +600,7 @@ class TrxFile():
         self.close()
         self.__dict__ = trx.__dict__
 
-    def _copy_variable_array_from(self, trx, only_groups=False):
-
-    def _copy_fixed_array_from(self, trx, strs_start=0, pts_start=0):
+    def _copy_fixed_arrays_from(self, trx, strs_start=0, pts_start=0):
         curr_strs_len, curr_pts_len = trx._get_real_size()
         strs_end = strs_start + curr_strs_len
         pts_end = pts_start + curr_pts_len
@@ -662,8 +637,13 @@ class TrxFile():
                 or self.header['nbr_points'] < nbr_points:
             self.resize(nbr_streamlines=nbr_streamlines+buffer_size,
                         nbr_points=nbr_points+buffer_size*100)
-        _ = concatenate([self, trx], preallocation=True,
-                        delete_dpg=True, delete_groups=True)
+            _ = concatenate([self, trx], preallocation=True,
+                            delete_groups=True)
+        else:
+            trx = concatenate([self, trx], preallocation=False,
+                              delete_groups=False)
+            self.close()
+            self.__dict__ = trx.__dict__
 
     @ staticmethod
     def from_sft(sft):
