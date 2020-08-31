@@ -24,6 +24,14 @@ def _compute_lengths(offsets, nbr_points):
     return lengths.astype(np.uint32)
 
 
+def _is_dtype_valid(ext):
+    try:
+        isinstance(np.dtype(ext[1:]), np.dtype)
+        return True
+    except TypeError:
+        return False
+
+
 def _dichotomic_search(x, l_bound=None, r_bound=None):
     """ Find where data of a contiguous array is actually ending """
     if l_bound is None and r_bound is None:
@@ -103,6 +111,9 @@ def load_from_zip(filename):
             if elem_filename == 'header.json':
                 continue
             _, ext = os.path.splitext(elem_filename)
+            if not _is_dtype_valid(ext):
+                raise ValueError('The dtype if {} is not supported'.format(
+                    elem_filename))
 
             mem_adress = zip_info.header_offset + len(zip_info.FileHeader())
             size = zip_info.file_size / np.dtype(ext[1:]).itemsize
@@ -128,6 +139,9 @@ def load_from_directory(directory):
             if name == 'header.json':
                 continue
             _, ext = os.path.splitext(elem_filename)
+            if not _is_dtype_valid(ext):
+                raise ValueError('The dtype if {} is not supported'.format(
+                    elem_filename))
 
             size = os.path.getsize(elem_filename) / np.dtype(ext[1:]).itemsize
             if size.is_integer():
@@ -146,6 +160,9 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=Fals
     """ Concatenate multiple TrxFile together, support preallocation """
     trx_list = [curr_trx for curr_trx in trx_list
                 if curr_trx.header['nbr_streamlines'] > 0]
+    if len(trx_list) == 0:
+        logging.warning('Inputs of concatenation were empty.')
+        return TrxFile()
 
     ref_trx = trx_list[0]
 
@@ -507,6 +524,7 @@ class TrxFile():
             else:
                 filename = elem_filename
             base, ext = os.path.splitext(elem_filename)
+
             folder = os.path.dirname(base)
             base = os.path.basename(base)
             mem_adress, size = dict_pointer_size[elem_filename]
