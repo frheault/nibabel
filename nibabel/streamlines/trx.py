@@ -49,11 +49,12 @@ def _dichotomic_search(x, l_bound=None, r_bound=None):
         return _dichotomic_search(x, mid_bound, r_bound)
 
 
-def _create_memmap(filename, mode='r', shape=(1,), dtype=np.float32, offset=0):
+def _create_memmap(filename, mode='r', shape=(1,), dtype=np.float32, offset=0,
+                   order='C'):
     """ Wrapper to support empty array as memmaps """
     if shape[0]:
         return np.memmap(filename, mode=mode, offset=offset,
-                         shape=shape,  dtype=dtype)
+                         shape=shape,  dtype=dtype, order=order)
     else:
         if not os.path.isfile(filename):
             f = open(filename, "wb")
@@ -291,6 +292,7 @@ def save(trx, filename, compression_standard=zipfile.ZIP_STORED):
         with open(os.path.join(tmp_dir, 'header.json'), 'w') as out_json:
             json.dump(trx.header, out_json)
 
+        # tofile() alway write in C-order, transpose to save it as F-order
         trx.streamlines._data.tofile(os.path.join(tmp_dir, 'positions.{}'.format(
             trx.streamlines._data.dtype.name)))
         trx.streamlines._offsets.tofile(os.path.join(tmp_dir, 'offsets.{}'.format(
@@ -324,7 +326,8 @@ def save(trx, filename, compression_standard=zipfile.ZIP_STORED):
                 # Creates 'dpg/' only if required
                 if not os.path.isdir(os.path.join(tmp_dir, 'dpg/')):
                     os.mkdir(os.path.join(tmp_dir, 'dpg/'))
-                os.mkdir(os.path.join(tmp_dir, 'dpg/', group_key))
+                if not os.path.isdir(os.path.join(tmp_dir, 'dpg/', group_key)):
+                    os.mkdir(os.path.join(tmp_dir, 'dpg/', group_key))
                 to_dump = trx.data_per_group[group_key][dpg_key]
                 to_dump.tofile(os.path.join(tmp_dir,
                                             'dpg/{}/{}.{}'.format(group_key,
@@ -416,6 +419,9 @@ class TrxFile():
         curr_strs_len, curr_pts_len = trx._get_real_len()
         strs_end = strs_start + curr_strs_len
         pts_end = pts_start + curr_pts_len
+
+        if curr_pts_len == 0:
+            return strs_start, pts_start
 
         # Mandatory arrays
         self.streamlines._data[pts_start:pts_end]\
@@ -517,7 +523,7 @@ class TrxFile():
         """ After reading the structure of a zip/folder, create a TrxFile """
         trx = TrxFile()
         trx.header = header
-
+        positions, offsets = None, None
         for elem_filename in dict_pointer_size.keys():
             if root_zip:
                 filename = root_zip
@@ -579,9 +585,7 @@ class TrxFile():
                     elem_filename))
 
         # All essential array must be declared
-        if positions is not None \
-            and offsets is not None \
-                and lengths is not None:
+        if positions is not None and offsets is not None:
             trx.streamlines._data = positions
             trx.streamlines._offsets = offsets
             trx.streamlines._lengths = lengths
@@ -609,6 +613,7 @@ class TrxFile():
                 logging.warning('Keeping the appropriate points count for '
                                 'consistency, overwritting provided parameters.')
 
+        # Resizing points is too dangerous as an operation, not allowed
         if nbr_points is None:
             nbr_points = pts_end
         elif nbr_points < pts_end:
@@ -657,24 +662,26 @@ class TrxFile():
                                                                      len(tmp)))
             trx.groups[group_key][:] = tmp
 
-            if not delete_dpg:
-                if len(trx.data_per_group.keys()) > 0:
-                    os.mkdir(os.path.join(tmp_dir, 'dpg/'))
+            if delete_dpg:
+                continue
 
-                if group_key not in trx.data_per_group:
-                    self.data_per_group[group_key] = {}
-                    for dpg_key in self.data_per_group[group_key].keys():
-                        dpg_dtype = self.data_per_group[group_key][dpg_key].dtype
-                        dpg_name = os.path.join(tmp_dir, 'dpg/', group_key,
-                                                '{}.{}'.format(dpg_key,
-                                                               dpg_dtype.name))
-                        if dpg_key not in trx.data_per_group[group_key]:
-                            trx.data_per_group[group_key] = {}
-                        trx.data_per_group[group_key][dpg_key] = _create_memmap(
-                            dpg_name, mode='w+', shape=(1,), dtype=dpg_dtype)
+            if len(trx.data_per_group.keys()) > 0:
+                os.mkdir(os.path.join(tmp_dir, 'dpg/'))
 
-                        trx.data_per_group[group_key][dpg_key][:]\
-                            = self.self.data_per_group[group_key][dpg_key]
+            if group_key not in trx.data_per_group:
+                self.data_per_group[group_key] = {}
+                for dpg_key in self.data_per_group[group_key].keys():
+                    dpg_dtype = self.data_per_group[group_key][dpg_key].dtype
+                    dpg_name = os.path.join(tmp_dir, 'dpg/', group_key,
+                                            '{}.{}'.format(dpg_key,
+                                                           dpg_dtype.name))
+                    if dpg_key not in trx.data_per_group[group_key]:
+                        trx.data_per_group[group_key] = {}
+                    trx.data_per_group[group_key][dpg_key] = _create_memmap(
+                        dpg_name, mode='w+', shape=(1,), dtype=dpg_dtype)
+
+                    trx.data_per_group[group_key][dpg_key][:]\
+                        = self.self.data_per_group[group_key][dpg_key]
         self.close()
         self.__dict__ = trx.__dict__
 
@@ -692,6 +699,52 @@ class TrxFile():
         _ = concatenate([self, trx], preallocation=True,
                         delete_groups=True)
 
+    def get(self, indices, keep_group=True, keep_dpg=False):
+        """ Get a subset of items, always points to the same memmaps """
+        indices = np.array(indices, dtype=np.uint32)
+        new_trx = TrxFile()
+        new_trx.header = self.header
+
+        if len(indices) == 0:
+            return new_trx
+
+        new_trx.streamlines = self.streamlines[indices].copy()
+        for dpp_key in self.data_per_point.keys():
+            new_trx.data_per_point[dpp_key] = \
+                self.data_per_point[dpp_key][indices].copy()
+
+        for dps_key in self.data_per_streamline.keys():
+            new_trx.data_per_streamline[dps_key] = \
+                self.data_per_streamline[dps_key][indices]
+
+        # Not keeping group is equivalent to the [] operator
+        if keep_group:
+            for group_key in self.groups.keys():
+                # Keep the group indices even when fancy slicing
+                index = np.argsort(indices)
+                sorted_x = indices[index]
+                sorted_index = np.searchsorted(sorted_x, self.groups[group_key])
+                yindex = np.take(index, sorted_index, mode="clip")
+                mask = indices[yindex] != self.groups[group_key]
+                intersect = yindex[~mask]
+
+                if len(intersect) == 0:
+                    continue
+
+                new_trx.groups[group_key] = intersect
+                if keep_dpg:
+                    logging.warning('Keeping dpg despite affecting the group '
+                                    'items.')
+                    for dpg_key in self.data_per_group[group_key].keys():
+                        if group_key not in new_trx.data_per_group:
+                            new_trx.data_per_group[group_key] = {}
+                        new_trx.data_per_group[group_key][dpg_key] = \
+                            self.data_per_group[group_key][dpg_key]
+
+        new_trx.header['nbr_points'] = len(new_trx.streamlines._data)
+        new_trx.header['nbr_streamlines'] = len(new_trx.streamlines._lengths)
+        return new_trx
+
     @ staticmethod
     def from_sft(sft, cast_position=np.float16):
         """ Generate a valid TrxFile from a StatefulTractogram """
@@ -699,18 +752,36 @@ class TrxFile():
             logging.warning('Casting as {}, considering using a floating point '
                             'dtype.'.format(cast_position))
 
-        trx = TrxFile()
+        trx = TrxFile(nbr_points=len(sft.streamlines._data),
+                      nbr_streamlines=len(sft.streamlines))
         trx.header = {'dimensions': sft.dimensions.tolist(),
                       'affine': sft.affine.tolist(),
                       'nbr_points': len(sft.streamlines._data),
                       'nbr_streamlines': len(sft.streamlines)}
-        trx.streamlines = deepcopy(sft.streamlines)
-        trx.data_per_streamline = deepcopy(sft.data_per_streamline)
-        trx.data_per_point = deepcopy(sft.data_per_point)
 
+        old_space = deepcopy(sft.space)
+        old_origin = deepcopy(sft.origin)
+
+        # TrxFile are written on disk in RASMM/center convention
+        sft.to_rasmm()
+        sft.to_center()
         if cast_position != np.float32:
-            trx.streamlines._data = trx.streamlines._data.astype(cast_position)
+            tmp_streamlines = deepcopy(sft.streamlines)
+        else:
+            tmp_streamlines = sft.streamlines
+        sft.to_space(old_space)
+        sft.to_origin(old_origin)
 
+        # Cast the int64 of Nibabel to uint64
+        tmp_streamlines._offsets = tmp_streamlines._offsets.astype(np.uint64)
+        if cast_position != np.float32:
+            tmp_streamlines._data = tmp_streamlines._data.astype(cast_position)
+
+        trx.streamlines = tmp_streamlines
+        trx.data_per_streamline = sft.data_per_streamline
+        trx.data_per_point = sft.data_per_point
+
+        # For safety and for RAM, convert the whole object to memmaps
         tmpdir = tempfile.TemporaryDirectory()
         save(trx, tmpdir.name)
         trx = load_from_directory(tmpdir.name)
@@ -718,17 +789,20 @@ class TrxFile():
 
         return trx
 
-    def to_sft(self):
+    def to_sft(self, resize=False):
         """ Convert a TrxFile to a valid StatefulTractogram """
         affine = np.array(self.header['affine'], dtype=np.float32)
         dimensions = np.array(self.header['dimensions'], dtype=np.uint16)
         vox_sizes = np.array(voxel_sizes(affine), dtype=np.float32)
         vox_order = ''.join(aff2axcodes(affine))
         space_attributes = (affine, dimensions, vox_sizes, vox_order)
-        self.resize()
+
+        if resize:
+            self.resize()
         sft = StatefulTractogram(self.streamlines, space_attributes, Space.RASMM,
                                  data_per_point=self.data_per_point,
                                  data_per_streamline=self.data_per_streamline)
+
         return sft
 
     def close(self):
