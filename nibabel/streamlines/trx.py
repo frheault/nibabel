@@ -401,6 +401,56 @@ class TrxFile():
         self.header['nbr_points'] = nbr_points
         self.header['nbr_streamlines'] = nbr_streamlines
 
+    def __str__(self):
+        """ Generate the string for printing """
+        affine = np.array(self.header['affine'], dtype=np.float32)
+        dimensions = np.array(self.header['dimensions'], dtype=np.uint16)
+        vox_sizes = np.array(voxel_sizes(affine), dtype=np.float32)
+        vox_order = ''.join(aff2axcodes(affine))
+
+        text = 'Affine: \n{}'.format(
+            np.array2string(affine,
+                            formatter={'float_kind': lambda x: "%.6f" % x}))
+        text += '\ndimensions: {}'.format(
+            np.array2string(dimensions))
+        text += '\nvoxel_sizes: {}'.format(
+            np.array2string(vox_sizes,
+                            formatter={'float_kind': lambda x: "%.2f" % x}))
+        text += '\nvoxel_order: {}'.format(vox_order)
+
+        strs_size = self.header['nbr_streamlines']
+        pts_size = self.header['nbr_points']
+        strs_len, pts_len = self._get_real_len()
+
+        if strs_size != strs_len or pts_size != pts_len:
+            text += '\nstreamline_size: {}'.format(strs_size)
+            text += '\npoint_size: {}'.format(pts_size)
+
+        text += '\nstreamline_count: {}'.format(strs_len)
+        text += '\npoint_count: {}'.format(pts_len)
+        text += '\ndata_per_point keys: {}'.format(
+            list(self.data_per_point.keys()))
+        text += '\ndata_per_streamline keys: {}'.format(
+            list(self.data_per_streamline.keys()))
+
+        text += '\ngroups keys: {}'.format(list(self.groups.keys()))
+        for group_key in self.groups.keys():
+            if group_key in self.data_per_group:
+                text += '\ndata_per_groups ({}) keys: {}'.format(
+                    group_key, list(self.data_per_group[group_key].keys()))
+        return text
+
+    def __len__(self):
+        """ Define the length of the object """
+        return len(self.streamlines)
+
+    def __getitem__(self, key):
+        """ Slice all data in a consistent way """
+        if isinstance(key, int):
+            key = [key]
+
+        return self.get(key, keep_group=False)
+
     def _get_real_len(self):
         """ Get the real size of data (ignoring zeros of preallocation) """
         if len(self.streamlines._lengths) == 0:
@@ -426,15 +476,13 @@ class TrxFile():
         # Mandatory arrays
         self.streamlines._data[pts_start:pts_end]\
             = trx.streamlines._data[0:curr_pts_len]
-        self.streamlines._offsets[strs_start:strs_end] = \
-            trx.streamlines._offsets[0:curr_strs_len] + pts_start
-        self.streamlines._lengths[strs_start:strs_end] = \
-            trx.streamlines._lengths[0:curr_strs_len]
+        self.streamlines._offsets[strs_start:strs_end] = trx.streamlines._offsets[0:curr_strs_len] + pts_start
+        self.streamlines._lengths[strs_start:strs_end] = trx.streamlines._lengths[0:curr_strs_len]
 
         # Optional fixed-sized arrays
         for dpp_key in self.data_per_point.keys():
-            self.data_per_point[dpp_key]._data[pts_start:pts_end] = \
-                trx.data_per_point[dpp_key]._data[0:curr_pts_len]
+            self.data_per_point[dpp_key]._data[pts_start:
+                                               pts_end] = trx.data_per_point[dpp_key]._data[0:curr_pts_len]
             self.data_per_point[dpp_key]._offsets = self.streamlines._offsets
             self.data_per_point[dpp_key]._lengths = self.streamlines._lengths
 
@@ -443,7 +491,7 @@ class TrxFile():
                 = trx.data_per_streamline[dps_key][0:curr_strs_len]
         return strs_end, pts_end
 
-    @staticmethod
+    @ staticmethod
     def _initialize_empty_trx(nbr_streamlines, nbr_points, init_as=None):
         """ Create on-disk memmaps of a certain size (preallocation) """
         trx = TrxFile()
@@ -685,7 +733,7 @@ class TrxFile():
         self.close()
         self.__dict__ = trx.__dict__
 
-    def append(self, trx, buffer_size=0):
+    def append(self, trx, extra_buffer=0):
         """ Append a TrxFile to another (support buffer) """
         strs_end, pts_end = self._get_real_len()
 
@@ -694,28 +742,31 @@ class TrxFile():
 
         if self.header['nbr_streamlines'] < nbr_streamlines \
                 or self.header['nbr_points'] < nbr_points:
-            self.resize(nbr_streamlines=nbr_streamlines+buffer_size,
-                        nbr_points=nbr_points+buffer_size*100)
+            self.resize(nbr_streamlines=nbr_streamlines+extra_buffer,
+                        nbr_points=nbr_points+extra_buffer*100)
         _ = concatenate([self, trx], preallocation=True,
                         delete_groups=True)
 
     def get(self, indices, keep_group=True, keep_dpg=False):
         """ Get a subset of items, always points to the same memmaps """
-        indices = np.array(indices, dtype=np.uint32)
+        if keep_group:
+            indices = np.array(indices, dtype=np.uint32)
+
+        if keep_dpg and not keep_group:
+            raise ValueError('Cannot keep dpg if not keeping groups.')
+
         new_trx = TrxFile()
         new_trx.header = self.header
 
-        if len(indices) == 0:
+        if isinstance(indices, np.ndarray) and len(indices) == 0:
             return new_trx
 
         new_trx.streamlines = self.streamlines[indices].copy()
         for dpp_key in self.data_per_point.keys():
-            new_trx.data_per_point[dpp_key] = \
-                self.data_per_point[dpp_key][indices].copy()
+            new_trx.data_per_point[dpp_key] = self.data_per_point[dpp_key][indices].copy()
 
         for dps_key in self.data_per_streamline.keys():
-            new_trx.data_per_streamline[dps_key] = \
-                self.data_per_streamline[dps_key][indices]
+            new_trx.data_per_streamline[dps_key] = self.data_per_streamline[dps_key][indices]
 
         # Not keeping group is equivalent to the [] operator
         if keep_group:
@@ -738,8 +789,7 @@ class TrxFile():
                     for dpg_key in self.data_per_group[group_key].keys():
                         if group_key not in new_trx.data_per_group:
                             new_trx.data_per_group[group_key] = {}
-                        new_trx.data_per_group[group_key][dpg_key] = \
-                            self.data_per_group[group_key][dpg_key]
+                        new_trx.data_per_group[group_key][dpg_key] = self.data_per_group[group_key][dpg_key]
 
         new_trx.header['nbr_points'] = len(new_trx.streamlines._data)
         new_trx.header['nbr_streamlines'] = len(new_trx.streamlines._lengths)
