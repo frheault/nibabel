@@ -124,6 +124,7 @@ def load_from_zip(filename):
                 files_pointer_size[elem_filename] = mem_adress, int(size)
             else:
                 raise ValueError('Wrong size or datatype')
+
     return TrxFile._create_trx_from_pointer(header, files_pointer_size,
                                             root_zip=filename)
 
@@ -289,64 +290,17 @@ def concatenate(trx_list, delete_dpp=False, delete_dps=False, delete_groups=Fals
 
 def save(trx, filename, compression_standard=zipfile.ZIP_STORED):
     """ Save a TrxFile (compressed or not) """
-    trx.resize()
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        with open(os.path.join(tmp_dir, 'header.json'), 'w') as out_json:
-            json.dump(trx.header, out_json)
+    copy_trx = trx.deepcopy()
+    copy_trx.resize()
 
-        # tofile() alway write in C-order, transpose to save it as F-order
-        trx.streamlines._data.tofile(os.path.join(tmp_dir, 'positions.{}'.format(
-            trx.streamlines._data.dtype.name)))
-        trx.streamlines._offsets.tofile(os.path.join(tmp_dir, 'offsets.{}'.format(
-            trx.streamlines._offsets.dtype.name)))
-
-        if len(trx.data_per_point.keys()) > 0:
-            os.mkdir(os.path.join(tmp_dir, 'dpp/'))
-        for dpp_key in trx.data_per_point.keys():
-            to_dump = trx.data_per_point[dpp_key]._data
-            dtype_name = to_dump.dtype.name
-            to_dump.tofile(os.path.join(tmp_dir,
-                                        'dpp/{}.{}'.format(dpp_key,
-                                                           dtype_name)))
-        if len(trx.data_per_streamline.keys()) > 0:
-            os.mkdir(os.path.join(tmp_dir, 'dps/'))
-        for dps_key in trx.data_per_streamline.keys():
-            to_dump = trx.data_per_streamline[dps_key]
-            dtype_name = to_dump.dtype.name
-            to_dump.tofile(os.path.join(tmp_dir,
-                                        'dps/{}.{}'.format(dps_key,
-                                                           dtype_name)))
-
-        if len(trx.groups.keys()) > 0:
-            os.mkdir(os.path.join(tmp_dir, 'groups/'))
-        for group_key in trx.groups.keys():
-            to_dump = trx.groups[group_key]
-            dtype_name = to_dump.dtype.name
-            to_dump.tofile(os.path.join(tmp_dir,
-                                        'groups/{}.{}'.format(group_key,
-                                                              dtype_name)))
-            if group_key not in trx.data_per_group:
-                continue
-            for dpg_key in trx.data_per_group[group_key].keys():
-                # Creates 'dpg/' only if required
-                if not os.path.isdir(os.path.join(tmp_dir, 'dpg/')):
-                    os.mkdir(os.path.join(tmp_dir, 'dpg/'))
-                if not os.path.isdir(os.path.join(tmp_dir, 'dpg/', group_key)):
-                    os.mkdir(os.path.join(tmp_dir, 'dpg/', group_key))
-                to_dump = trx.data_per_group[group_key][dpg_key]
-                dtype_name = to_dump.dtype.name
-
-                to_dump.tofile(os.path.join(tmp_dir,
-                                            'dpg/{}/{}.{}'.format(group_key,
-                                                                  dpg_key,
-                                                                  dtype_name)))
-
-        if os.path.splitext(filename)[1]:
-            zip_from_folder(tmp_dir, filename, compression_standard)
-        else:
-            if os.path.isdir(filename):
-                shutil.rmtree(filename)
-            shutil.copytree(tmp_dir, filename)
+    tmp_dir_name = copy_trx._uncompressed_folder_handle.name
+    if os.path.splitext(filename)[1]:
+        zip_from_folder(tmp_dir_name, filename, compression_standard)
+    else:
+        if os.path.isdir(filename):
+            shutil.rmtree(filename)
+        shutil.copytree(tmp_dir_name, filename)
+    copy_trx.close()
 
 
 def zip_from_folder(directory, filename,
@@ -378,9 +332,9 @@ class TrxFile():
             dimensions = np.array([1, 1, 1], dtype=np.uint16)
 
         if nbr_points is None and nbr_streamlines is None:
-            if init_as is not None:
-                raise ValueError('Cant use init_as without declaring '
-                                 'nbr_points AND nbr_streamlines')
+            # if init_as is not None:
+            #     raise ValueError('Cant use init_as without declaring '
+            #                      'nbr_points AND nbr_streamlines')
             logging.debug('Intializing empty TrxFile.')
             self.header = {}
             self.streamlines = ArraySequence()
@@ -457,6 +411,65 @@ class TrxFile():
             key = [key]
 
         return self.get(key, keep_group=False)
+
+    def __deepcopy__(self):
+        return self.deepcopy()
+
+    def deepcopy(self):
+        tmp_dir = tempfile.TemporaryDirectory()
+        with open(os.path.join(tmp_dir.name, 'header.json'), 'w') as out_json:
+            json.dump(self.header, out_json)
+
+        # tofile() alway write in C-order
+        self.streamlines._data.tofile(os.path.join(tmp_dir.name, 'positions.{}'.format(
+            self.streamlines._data.dtype.name)))
+        self.streamlines._offsets.tofile(os.path.join(tmp_dir.name, 'offsets.{}'.format(
+            self.streamlines._offsets.dtype.name)))
+
+        if len(self.data_per_point.keys()) > 0:
+            os.mkdir(os.path.join(tmp_dir.name, 'dpp/'))
+        for dpp_key in self.data_per_point.keys():
+            to_dump = self.data_per_point[dpp_key]._data
+            dtype_name = to_dump.dtype.name
+            to_dump.tofile(os.path.join(tmp_dir.name,
+                                        'dpp/{}.{}'.format(dpp_key,
+                                                           dtype_name)))
+        if len(self.data_per_streamline.keys()) > 0:
+            os.mkdir(os.path.join(tmp_dir.name, 'dps/'))
+        for dps_key in self.data_per_streamline.keys():
+            to_dump = self.data_per_streamline[dps_key]
+            dtype_name = to_dump.dtype.name
+            to_dump.tofile(os.path.join(tmp_dir.name,
+                                        'dps/{}.{}'.format(dps_key,
+                                                           dtype_name)))
+
+        if len(self.groups.keys()) > 0:
+            os.mkdir(os.path.join(tmp_dir.name, 'groups/'))
+        for group_key in self.groups.keys():
+            to_dump = self.groups[group_key]
+            dtype_name = to_dump.dtype.name
+            to_dump.tofile(os.path.join(tmp_dir.name,
+                                        'groups/{}.{}'.format(group_key,
+                                                              dtype_name)))
+            if group_key not in self.data_per_group:
+                continue
+            for dpg_key in self.data_per_group[group_key].keys():
+                # Creates 'dpg/' only if required
+                if not os.path.isdir(os.path.join(tmp_dir.name, 'dpg/')):
+                    os.mkdir(os.path.join(tmp_dir.name, 'dpg/'))
+                if not os.path.isdir(os.path.join(tmp_dir.name, 'dpg/', group_key)):
+                    os.mkdir(os.path.join(tmp_dir.name, 'dpg/', group_key))
+                to_dump = self.data_per_group[group_key][dpg_key]
+                dtype_name = to_dump.dtype.name
+
+                to_dump.tofile(os.path.join(tmp_dir.name,
+                                            'dpg/{}/{}.{}'.format(group_key,
+                                                                  dpg_key,
+                                                                  dtype_name)))
+        copy_trx = load_from_directory(tmp_dir.name)
+        copy_trx._uncompressed_folder_handle = tmp_dir
+
+        return copy_trx
 
     def _get_real_len(self):
         """ Get the real size of data (ignoring zeros of preallocation) """
@@ -781,6 +794,16 @@ class TrxFile():
         new_trx.header = self.header
 
         if isinstance(indices, np.ndarray) and len(indices) == 0:
+            # Even while empty, basic dtype and header must be coherent
+            data_dtype = self.streamlines._data.dtype
+            offsets_dtype = self.streamlines._offsets.dtype
+            lengths_dtype = self.streamlines._lengths.dtype
+            new_trx.streamlines._data = new_trx.streamlines._data.astype(data_dtype)
+            new_trx.streamlines._offsets = new_trx.streamlines._offsets.astype(offsets_dtype)
+            new_trx.streamlines._lengths = new_trx.streamlines._lengths.astype(lengths_dtype)
+            new_trx.header['nbr_points'] = len(new_trx.streamlines._data)
+            new_trx.header['nbr_streamlines'] = len(new_trx.streamlines._lengths)
+
             return new_trx
 
         new_trx.streamlines = self.streamlines[indices].copy()
