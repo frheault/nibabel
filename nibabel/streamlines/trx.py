@@ -117,7 +117,8 @@ def load_from_zip(filename):
                     elem_filename))
 
             mem_adress = zip_info.header_offset + len(zip_info.FileHeader())
-            size = zip_info.file_size / np.dtype(ext[1:]).itemsize
+            dtype_size = np.dtype(ext[1:]).itemsize
+            size = zip_info.file_size / dtype_size
 
             if size.is_integer():
                 files_pointer_size[elem_filename] = mem_adress, int(size)
@@ -144,7 +145,8 @@ def load_from_directory(directory):
                 raise ValueError('The dtype if {} is not supported'.format(
                     elem_filename))
 
-            size = os.path.getsize(elem_filename) / np.dtype(ext[1:]).itemsize
+            dtype_size = np.dtype(ext[1:]).itemsize
+            size = os.path.getsize(elem_filename) / dtype_size
             if size.is_integer():
                 files_pointer_size[elem_filename] = 0, int(size)
             elif os.path.getsize(elem_filename) == 1:
@@ -302,24 +304,27 @@ def save(trx, filename, compression_standard=zipfile.ZIP_STORED):
             os.mkdir(os.path.join(tmp_dir, 'dpp/'))
         for dpp_key in trx.data_per_point.keys():
             to_dump = trx.data_per_point[dpp_key]._data
+            dtype_name = to_dump.dtype.name
             to_dump.tofile(os.path.join(tmp_dir,
                                         'dpp/{}.{}'.format(dpp_key,
-                                                           to_dump.dtype.name)))
+                                                           dtype_name)))
         if len(trx.data_per_streamline.keys()) > 0:
             os.mkdir(os.path.join(tmp_dir, 'dps/'))
         for dps_key in trx.data_per_streamline.keys():
             to_dump = trx.data_per_streamline[dps_key]
+            dtype_name = to_dump.dtype.name
             to_dump.tofile(os.path.join(tmp_dir,
                                         'dps/{}.{}'.format(dps_key,
-                                                           to_dump.dtype.name)))
+                                                           dtype_name)))
 
         if len(trx.groups.keys()) > 0:
             os.mkdir(os.path.join(tmp_dir, 'groups/'))
         for group_key in trx.groups.keys():
             to_dump = trx.groups[group_key]
+            dtype_name = to_dump.dtype.name
             to_dump.tofile(os.path.join(tmp_dir,
                                         'groups/{}.{}'.format(group_key,
-                                                              to_dump.dtype.name)))
+                                                              dtype_name)))
             if group_key not in trx.data_per_group:
                 continue
             for dpg_key in trx.data_per_group[group_key].keys():
@@ -329,10 +334,12 @@ def save(trx, filename, compression_standard=zipfile.ZIP_STORED):
                 if not os.path.isdir(os.path.join(tmp_dir, 'dpg/', group_key)):
                     os.mkdir(os.path.join(tmp_dir, 'dpg/', group_key))
                 to_dump = trx.data_per_group[group_key][dpg_key]
+                dtype_name = to_dump.dtype.name
+
                 to_dump.tofile(os.path.join(tmp_dir,
                                             'dpg/{}/{}.{}'.format(group_key,
                                                                   dpg_key,
-                                                                  to_dump.dtype.name)))
+                                                                  dtype_name)))
 
         if os.path.splitext(filename)[1]:
             zip_from_folder(tmp_dir, filename, compression_standard)
@@ -487,7 +494,7 @@ class TrxFile():
             self.data_per_point[dpp_key]._lengths = self.streamlines._lengths
 
         for dps_key in self.data_per_streamline.keys():
-            self.data_per_streamline[dps_key][strs_start:strs_end]\
+            self.data_per_streamline[dps_key][strs_start:strs_end] \
                 = trx.data_per_streamline[dps_key][0:curr_strs_len]
         return strs_end, pts_end
 
@@ -538,28 +545,33 @@ class TrxFile():
 
             for dpp_key in init_as.data_per_point.keys():
                 dtype = init_as.data_per_point[dpp_key]._data.dtype
+                shape = (nbr_points, init_as.data_per_point[dpp_key]._data.shape[-1])
                 dpp_filename = os.path.join(tmp_dir.name, 'dpp/'
                                             '{}.{}'.format(dpp_key, dtype.name))
-                logging.debug('Initializing {} (dpp) with dtype: {}'.format(
-                    dpp_key, dtype.name))
+                logging.debug('Initializing {} (dpp) with dtype: '
+                              '{}'.format(dpp_key, dtype.name))
                 trx.data_per_point[dpp_key] = ArraySequence()
                 trx.data_per_point[dpp_key]._data = _create_memmap(dpp_filename,
                                                                    mode='w+',
-                                                                   shape=(nbr_points, 1),
+                                                                   shape=shape,
                                                                    dtype=dtype)
                 trx.data_per_point[dpp_key]._offsets = trx.streamlines._offsets
                 trx.data_per_point[dpp_key]._lengths = trx.streamlines._lengths
 
             for dps_key in init_as.data_per_streamline.keys():
                 dtype = init_as.data_per_streamline[dps_key].dtype
-                logging.debug('Initializing {} (dps) with dtype: {}'.format(
-                    dps_key, dtype.name))
+                if init_as.data_per_streamline[dps_key].ndim == 2:
+                    shape = (nbr_streamlines, init_as.data_per_streamline[dps_key].shape[-1])
+                else:
+                    shape = (nbr_streamlines,)
+                logging.debug('Initializing {} (dps) with and dtype: '
+                              '{}'.format(dps_key, dtype.name))
 
                 dps_filename = os.path.join(tmp_dir.name, 'dps/'
                                             '{}.{}'.format(dps_key, dtype.name))
                 trx.data_per_streamline[dps_key] = _create_memmap(dps_filename,
                                                                   mode='w+',
-                                                                  shape=(nbr_streamlines,),
+                                                                  shape=shape,
                                                                   dtype=dtype)
 
         trx._uncompressed_folder_handle = tmp_dir
@@ -586,6 +598,7 @@ class TrxFile():
             if root is not None and folder.startswith(root.rstrip('/')):
                 folder = folder.replace(root, '').lstrip('/')
 
+            # Parse the directory tree
             if base == 'positions' and folder == '':
                 if size != trx.header['nbr_points']*3:
                     raise ValueError('Wrong data size.')
@@ -602,27 +615,36 @@ class TrxFile():
                                          dtype=ext[1:])
                 lengths = _compute_lengths(offsets, trx.header['nbr_points'])
             elif folder == 'dps':
-                if size != trx.header['nbr_streamlines']:
+                nbr_scalar = size / trx.header['nbr_streamlines']
+                if not nbr_scalar.is_integer():
                     raise ValueError('Wrong dps size.')
+                else:
+                    shape = (trx.header['nbr_streamlines'], int(nbr_scalar))
+
                 trx.data_per_streamline[base] = _create_memmap(
                     filename, mode='r+', offset=mem_adress,
-                    shape=(trx.header['nbr_streamlines'],), dtype=ext[1:])
+                    shape=shape, dtype=ext[1:])
             elif folder == 'dpp':
-                if size != trx.header['nbr_points']:
+                nbr_scalar = size / trx.header['nbr_points']
+                if not nbr_scalar.is_integer():
                     raise ValueError('Wrong dpp size.')
+                else:
+                    shape = (trx.header['nbr_points'], int(nbr_scalar))
+
                 trx.data_per_point[base] = _create_memmap(
                     filename, mode='r+', offset=mem_adress,
-                    shape=(trx.header['nbr_points'], 1), dtype=ext[1:])
+                    shape=shape, dtype=ext[1:])
             elif folder.startswith('dpg'):
-                if size != 1:
-                    raise ValueError('Wrong dpg size.')
+                shape = (int(size),)
+
+                # Handle the two-layers architecture
                 data_name = os.path.basename(base)
                 sub_folder = os.path.basename(folder)
                 if sub_folder not in trx.data_per_group:
                     trx.data_per_group[sub_folder] = {}
                 trx.data_per_group[sub_folder][data_name] = _create_memmap(
                     filename, mode='r+', offset=mem_adress,
-                    shape=(1,), dtype=ext[1:])
+                    shape=shape, dtype=ext[1:])
             elif folder == 'groups':
                 trx.groups[base] = _create_memmap(filename, mode='r+',
                                                   offset=mem_adress,
